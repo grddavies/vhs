@@ -2,6 +2,8 @@
 
 module App (AppState (..), initState, app, Tick (..)) where
 
+import qualified Sprite as S
+
 import Brick (App (..), BrickEvent (AppEvent, VtyEvent), EventM, Location (..), ViewportType (Both), continueWithoutRedraw, modify, neverShowCursor, translateBy, viewport, vpSize)
 import qualified Brick.AttrMap as A
 import qualified Brick.Main as M
@@ -9,14 +11,13 @@ import Brick.Types (Widget)
 import Brick.Widgets.Core (raw)
 import Graphics.Vty (Image)
 import qualified Graphics.Vty as V
-import Graphics.Vty.Attributes (defAttr)
-import Graphics.Vty.Image (string)
 import Lens.Micro.Platform (makeLenses, (&), (.~), (^.))
 
 type Coord = (Int, Int)
 
 data AppState = AppState
-  { _spriteP :: Coord
+  { _sprite :: Image
+  , _spriteP :: Coord
   , _spriteV :: Coord
   , _viewportSize :: Coord
   }
@@ -27,14 +28,10 @@ makeLenses ''AppState
 -- Unit time
 data Tick = Tick
 
--- No named resources required
 data Name = VP deriving (Show, Eq, Ord)
 
-sprite :: Image
-sprite = string defAttr "o"
-
 drawUI :: AppState -> [Widget Name]
-drawUI st = [viewport VP Both $ renderSpriteAt sprite x y]
+drawUI st = [viewport VP Both $ renderSpriteAt (st ^. sprite) x y]
  where
   (x, y) = _spriteP st
 
@@ -61,15 +58,20 @@ updatePosition st =
       newPos = (x + dx, y + dy)
    in st & spriteP .~ newPos
 
-checkCollision :: Coord -> Coord -> (Bool, Bool)
-checkCollision (x, y) (w, h) = (x >= (w - 1) || x <= 0, y >= (h - 1) || y <= 0)
+checkCollision :: Image -> Coord -> Coord -> (Bool, Bool)
+checkCollision s (x, y) (vw, vh) = ((x + sw) >= (vw - 1) || x <= 0, (y + sh) >= (vh - 1) || y <= 0)
+ where
+  sh = V.imageHeight s
+  sw = V.imageWidth s
 
 updateVelocity :: AppState -> AppState
-updateVelocity st = case checkCollision (st ^. spriteP) (st ^. viewportSize) of
-  (False, False) -> st
-  (True, False) -> let (x', y') = st ^. spriteV in st & spriteV .~ (-x', y')
-  (False, True) -> let (x', y') = st ^. spriteV in st & spriteV .~ (x', -y')
-  (True, True) -> let (x', y') = st ^. spriteV in st & spriteV .~ (-x', -y')
+updateVelocity st =
+  let (x, y) = st ^. spriteV
+   in case checkCollision (st ^. sprite) (st ^. spriteP) (st ^. viewportSize) of
+        (False, False) -> st
+        (True, False) -> st & spriteV .~ (-x, y)
+        (False, True) -> st & spriteV .~ (x, -y)
+        (True, True) -> st & spriteV .~ (-x, -y)
 
 updateViewport :: Coord -> AppState -> AppState
 updateViewport wh = viewportSize .~ wh
@@ -87,4 +89,4 @@ handleEvent _ = continueWithoutRedraw
 -- Will do random in the future, hence IO
 initState :: IO AppState
 initState = do
-  return AppState{_spriteP = (1, 1), _spriteV = (1, 1)}
+  return AppState{_sprite = S.haskellySprite, _spriteP = (1, 1), _spriteV = (1, 1), _viewportSize = (5, 5)}

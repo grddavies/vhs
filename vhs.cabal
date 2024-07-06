@@ -33,6 +33,7 @@ library
   -- Modules exported by the library.
   exposed-modules:
     App
+    Sprite
 
   -- Modules included in this library but not exported.
   -- other-modules:
@@ -44,6 +45,7 @@ library
     brick,
     linear,
     microlens-platform,
+    vector,
     vty >=6.0,
 
   -- Directories containing source files.
